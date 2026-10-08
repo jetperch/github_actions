@@ -1,0 +1,68 @@
+# SPDX-FileCopyrightText: Copyright 2026 Jetperch LLC
+# SPDX-License-Identifier: Apache-2.0
+
+name: Windows code sign
+description: >-
+  Sign Windows PE files (.exe, .dll, .pyd) with AzureSignTool and an Azure
+  Key Vault certificate, then verify each signature.  Skips when no key vault
+  URI is given, such as for pull requests, which receive no secrets.
+
+inputs:
+  files:
+    description: Newline-separated file paths or wildcard patterns to sign.
+    required: true
+  azure_key_vault_uri:
+    description: The Azure Key Vault URI.  Empty skips signing.
+    required: false
+    default: ''
+  azure_client_id:
+    description: The Azure application (client) ID.
+    required: false
+    default: ''
+  azure_tenant_id:
+    description: The Azure tenant ID.
+    required: false
+    default: ''
+  azure_client_secret:
+    description: The Azure client secret.
+    required: false
+    default: ''
+  azure_cert_name:
+    description: The certificate name in the key vault.
+    required: false
+    default: ''
+  timestamp_url:
+    description: The RFC 3161 timestamp server.
+    required: false
+    default: http://timestamp.digicert.com
+  if_no_files_found:
+    description: When a pattern matches no files, one of error, warn or ignore.
+    required: false
+    default: error
+  azuresigntool_version:
+    description: The AzureSignTool version to install.  Empty installs the latest.
+    required: false
+    default: ''
+
+outputs:
+  signed:
+    description: '"true" when files were signed and verified, else "false".'
+    value: ${{ steps.sign.outputs.signed }}
+
+runs:
+  using: composite
+  steps:
+    - id: sign
+      shell: pwsh
+      # Inputs pass through the environment, never into the script text.
+      env:
+        WS_FILES: ${{ inputs.files }}
+        WS_KEY_VAULT_URI: ${{ inputs.azure_key_vault_uri }}
+        WS_CLIENT_ID: ${{ inputs.azure_client_id }}
+        WS_TENANT_ID: ${{ inputs.azure_tenant_id }}
+        WS_CLIENT_SECRET: ${{ inputs.azure_client_secret }}
+        WS_CERT_NAME: ${{ inputs.azure_cert_name }}
+        WS_TIMESTAMP_URL: ${{ inputs.timestamp_url }}
+        WS_IF_NO_FILES_FOUND: ${{ inputs.if_no_files_found }}
+        WS_TOOL_VERSION: ${{ inputs.azuresigntool_version }}
+      run: '& "$env:GITHUB_ACTION_PATH/windows_sign.ps1"'

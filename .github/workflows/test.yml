@@ -1,0 +1,82 @@
+# SPDX-FileCopyrightText: Copyright 2026 Jetperch LLC
+# SPDX-License-Identifier: Apache-2.0
+
+name: Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  reuse:
+    name: REUSE compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - run: python -m pip install "reuse[charset-normalizer]==6.2.0"
+      - run: python -m reuse lint
+
+  windows_sign:
+    name: windows_sign on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm]
+    env:
+      # Sign only on trusted refs, as callers do.  Otherwise this tests the
+      # skip path.
+      SIGN: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build an unsigned executable
+        run: |
+          cmake -S test -B build
+          cmake --build build --config Release
+          Copy-Item build/Release/hello.exe build/Release/hello2.exe
+
+      - name: Missing files fail by default
+        id: missing
+        continue-on-error: true
+        uses: ./windows_sign
+        with:
+          files: build/Release/does_not_exist.exe
+          azure_key_vault_uri: unused
+
+      - name: Check missing files failed
+        if: steps.missing.outcome != 'failure'
+        run: throw 'expected a failure for a pattern without files'
+
+      - name: Sign
+        id: sign
+        uses: ./windows_sign
+        with:
+          files: |
+            build/Release/*.exe
+          azure_key_vault_uri: ${{ env.SIGN == 'true' && secrets.AZURE_KEY_VAULT_URI || '' }}
+          azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+          azure_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          azure_cert_name: ${{ secrets.AZURE_CERT_NAME }}
+
+      - name: Check signatures
+        env:
+          SIGNED: ${{ steps.sign.outputs.signed }}
+        run: |
+          $expect = if ($env:SIGN -eq 'true') { 'Valid' } else { 'NotSigned' }
+          if (($env:SIGN -eq 'true') -ne ($env:SIGNED -eq 'true')) {
+              throw "signed output '$env:SIGNED' does not match SIGN '$env:SIGN'"
+          }
+          foreach ($f in 'build/Release/hello.exe', 'build/Release/hello2.exe') {
+              $status = (Get-AuthenticodeSignature $f).Status
+              Write-Host "$f : $status"
+              if ("$status" -ne $expect) { throw "expected $expect" }
+          }
+          & build/Release/hello.exe
+          if ($LASTEXITCODE) { throw 'hello.exe failed' }
