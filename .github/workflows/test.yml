@@ -47,7 +47,12 @@ jobs:
         uses: ./windows_sign
         with:
           files: build/Release/does_not_exist.exe
+          # Dummy credentials pass the input checks, so the file check fails.
           azure_key_vault_uri: unused
+          azure_client_id: unused
+          azure_tenant_id: unused
+          azure_client_secret: unused
+          azure_cert_name: unused
 
       - name: Check missing files failed
         if: steps.missing.outcome != 'failure'
