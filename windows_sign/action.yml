@@ -9,7 +9,9 @@ description: >-
 
 inputs:
   files:
-    description: Newline-separated file paths or wildcard patterns to sign.
+    description: >-
+      Newline-separated file paths or wildcard patterns to sign.
+      <dir>/**/<name> matches <name> recursively below <dir>.
     required: true
   azure_key_vault_uri:
     description: The Azure Key Vault URI.  Empty skips signing.

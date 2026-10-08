@@ -39,7 +39,20 @@ foreach ($line in ($env:WS_FILES -split "`r?`n")) {
     if (-not $pattern) {
         continue
     }
-    $found = @(Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue)
+    $idx = $pattern.IndexOf('**')
+    if ($idx -ge 0) {
+        # <dir>/**/<name>: recursive below <dir>.  <name> takes wildcards.
+        $base = $pattern.Substring(0, $idx).TrimEnd('/', '\')
+        $leaf = $pattern.Substring($idx + 2).TrimStart('/', '\')
+        if ($leaf -match '[/\\]' -or $leaf.Contains('**')) {
+            throw "windows_sign: '**' must be followed by a file name: '$pattern'"
+        }
+        if (-not $base) { $base = '.' }
+        if (-not $leaf) { $leaf = '*' }
+        $found = @(Get-ChildItem -Path $base -Recurse -File -Filter $leaf -ErrorAction SilentlyContinue)
+    } else {
+        $found = @(Get-ChildItem -Path $pattern -File -ErrorAction SilentlyContinue)
+    }
     if ($found.Count -eq 0) {
         $msg = "windows_sign: no files match '$pattern'"
         if ($env:WS_IF_NO_FILES_FOUND -eq 'error') {

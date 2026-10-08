@@ -50,7 +50,7 @@ also runs for pull requests.
 
 | Input | Default | Description |
 |---|---|---|
-| `files` | (required) | Newline-separated paths or wildcard patterns |
+| `files` | (required) | Newline-separated paths or wildcard patterns; `<dir>/**/<name>` recurses |
 | `azure_key_vault_uri` | `''` | Key Vault URI; empty skips signing |
 | `azure_client_id` | `''` | Application (client) ID |
 | `azure_tenant_id` | `''` | Tenant ID |

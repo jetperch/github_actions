@@ -40,6 +40,8 @@ jobs:
           cmake -S test -B build
           cmake --build build --config Release
           Copy-Item build/Release/hello.exe build/Release/hello2.exe
+          New-Item -ItemType Directory -Force build/nested/deeper | Out-Null
+          Copy-Item build/Release/hello.exe build/nested/deeper/hello3.exe
 
       # Call the script directly and catch the expected error: a failing
       # step with continue-on-error would add an error annotation.
@@ -69,6 +71,7 @@ jobs:
         with:
           files: |
             build/Release/*.exe
+            build/nested/**/*.exe
           azure_key_vault_uri: ${{ env.SIGN == 'true' && secrets.AZURE_KEY_VAULT_URI || '' }}
           azure_client_id: ${{ secrets.AZURE_CLIENT_ID }}
           azure_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
@@ -83,7 +86,7 @@ jobs:
           if (($env:SIGN -eq 'true') -ne ($env:SIGNED -eq 'true')) {
               throw "signed output '$env:SIGNED' does not match SIGN '$env:SIGN'"
           }
-          foreach ($f in 'build/Release/hello.exe', 'build/Release/hello2.exe') {
+          foreach ($f in 'build/Release/hello.exe', 'build/Release/hello2.exe', 'build/nested/deeper/hello3.exe') {
               $status = (Get-AuthenticodeSignature $f).Status
               Write-Host "$f : $status"
               if ("$status" -ne $expect) { throw "expected $expect" }
