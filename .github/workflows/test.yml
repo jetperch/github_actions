@@ -41,22 +41,27 @@ jobs:
           cmake --build build --config Release
           Copy-Item build/Release/hello.exe build/Release/hello2.exe
 
+      # Call the script directly and catch the expected error: a failing
+      # step with continue-on-error would add an error annotation.
       - name: Missing files fail by default
-        id: missing
-        continue-on-error: true
-        uses: ./windows_sign
-        with:
-          files: build/Release/does_not_exist.exe
-          # Dummy credentials pass the input checks, so the file check fails.
-          azure_key_vault_uri: unused
-          azure_client_id: unused
-          azure_tenant_id: unused
-          azure_client_secret: unused
-          azure_cert_name: unused
-
-      - name: Check missing files failed
-        if: steps.missing.outcome != 'failure'
-        run: throw 'expected a failure for a pattern without files'
+        env:
+          WS_FILES: build/Release/does_not_exist.exe
+          WS_KEY_VAULT_URI: unused
+          WS_CLIENT_ID: unused
+          WS_TENANT_ID: unused
+          WS_CLIENT_SECRET: unused
+          WS_CERT_NAME: unused
+          WS_TIMESTAMP_URL: unused
+          WS_IF_NO_FILES_FOUND: error
+        run: |
+          try {
+              & ./windows_sign/windows_sign.ps1
+          } catch {
+              if ("$_" -notlike '*no files match*') { throw "unexpected error: $_" }
+              Write-Host "expected error: $_"
+              exit 0
+          }
+          throw 'expected an error for a pattern without files'
 
       - name: Sign
         id: sign
